@@ -1,0 +1,2 @@
+### 2024.05.21
+* Write a function to round all numbers in a string -> will be used for printing nicer dictionaries of probabilities
