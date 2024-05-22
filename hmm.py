@@ -1,10 +1,10 @@
-"""main.py: Provides an HMM dataclass to store and calculate future 
-probabilities of a given model. Basic implementation as of current."""
+"""hmm.py: Provides HMM and State dataclasses to store and calculate future 
+state probabilities of a given model. Basic implementation as of current."""
 
 __author__ = "Liam Anthian"
 
 
-class HMM1:
+class HMM:
     # Dictionary of probability of transition to a state from prior state
     t_pb: dict[...: dict[...: float]]
 
@@ -30,8 +30,8 @@ class HMM1:
 class State:
     """Hashable, equatable, state in an HMM - contains transition probabilities
     from adjacently linked states."""
-    id: str
-    likelihood: dict['State': float]
+    id: str                                 # Name of state
+    likelihood: dict['State': float]        # Pr(self|other)
 
 
     def __init__(self, id, givens: dict['State': float] = {}):
@@ -58,48 +58,32 @@ class State:
         for k,pb in givens.items():
             self.likelihood[k] = pb
 
-    # def add(self, other: 'State', trans: dict['State': float]):
-    #     """Add a new linked state `other` according transition probabilities
-    #     `trans`. trans should not be empty."""
-    #     self.t_from_pb[other] = trans
-
 
     def given(self, prv: 'State', prior: float = 1) -> float:
         """Find the probability of a next state given a prior. Prior set as 1 by
-        default - assumes guaranteed previous state if not told otherwise."""
-        # Check if no way link between states        
-        if prv not in self.likelihood:
-            return 0
+        default - assumes guaranteed previous state if not told otherwise.
+            Pr(self|other) * Pr(other)"""
+        # Error check: Check if no way link between states        
+        if prv not in self.likelihood: return 0
+        
         # Otherwise return probability from state
         return self.likelihood[prv] * prior
     
     def total(self, priors: dict['State': float]) -> float:
-        """Find the total probability of a next state given all priors."""
+        """Find the total probability of a next state given all priors.
+        Returns Σ P(Rt|Rt-1) * P(Rt-1|...)
+            (sum of (likelihood times relevant prior))
+        """
         return sum([self.given(prv, pb) for prv,pb in priors.items()])
     
-    
-# class HMM2:
-#     # Set of states included in the model
-#     states: set[State]
+    def posterior_x_evidence(self, priors, e_likelihood) -> float | None:
+        """Finds partial posterior of a next state given priors & observed data.
+        Returns P(Rt|E1:t) * P(E1:t) by calculating P(E1:t|Rt) * P(Rt)
+            Normalisation still required with this output.
+        Alternatively, returns None if state independent from observed data."""
+        # Error check: Check if independent regarding evidence (marginal)
+        #   (do not include in calculation if so)
+        if self not in e_likelihood: return None # self.total(priors)
 
-#     def __init__(self, states: set[State] = set()):
-#         """Constructor method for HMM."""
-#         self.states = states.copy()
-
-
-#     def transition(self, prv: dict[State: float]) -> dict[State: float]:
-#         """Takes previous probabilities `prv` of states to occur and calculates 
-#         the next probabilities 1 step ahead, using transition probs `self.t_pb`.
-#         Returns a dictionary of states and likelihoods."""
-#         odds = {}
-#         for s_to in self.states:
-#             f_pb = s_to.t_from_pb
-
-#             odds[s_to.id] = 0
-#             # for p_from in f_pb.keys():
-#             for s2,prob in prv.items():
-#                 print(odds[s_to.id])
-#                 print(s_to.tfrom(s2))
-#                 odds[s_to.id] += s_to.tfrom(s2) * prob
-#         return odds
-    
+        # Otherwise return according to filtering equation
+        return e_likelihood[self] * self.total(priors)
